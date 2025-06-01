@@ -65,21 +65,16 @@ async function fetch(
     if (cacheHit) return cacheHit;
 
     const instance = await env.INSTANCES_KV.get(path.substring(1));
-    let resp: Response;
-    if (instance) {
-        resp = new Response(instance, {
-            headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": allowedMethods,
-                "Access-Control-Allow-Headers": "Content-Type",
-                "Cache-Control": "public, max-age=604800",
-            },
-        });
-    } else {
-        resp = textResp("Not found", 404);
-        resp.headers.set("Cache-Control", "public, max-age=604800");
-    }
+    if (!instance) return textResp("Not found", 404);
+    const resp = new Response(instance, {
+        headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": allowedMethods,
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Cache-Control": "public, max-age=604800",
+        },
+    });
     ctx.waitUntil(caches.default.put(url, resp.clone()));
     return resp;
 }
