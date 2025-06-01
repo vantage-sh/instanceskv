@@ -7,6 +7,7 @@ import {
     array,
     any,
     boolean,
+    record,
 } from "valibot";
 
 export default object({
@@ -24,5 +25,5 @@ export default object({
     reservedTerm: string(),
     compareOn: boolean(),
     selected: array(string()),
-    visibleColumns: array(string()),
+    visibleColumns: record(string(), boolean()),
 });
