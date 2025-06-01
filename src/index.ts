@@ -23,9 +23,17 @@ async function putJson(request: Request, env: Env): Promise<Response> {
     if (serialized.length > 15 * 1024)
         return textResp("Instance too large", 413);
 
-    const id = crypto.randomUUID();
-    await env.INSTANCES_KV.put(id, serialized);
-    return textResp(id, 200);
+    // Hash the instance
+    const id = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(serialized),
+    );
+    const idString = Array.from(new Uint8Array(id))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+    await env.INSTANCES_KV.put(idString, serialized);
+    return textResp(idString, 200);
 }
 
 async function fetch(
