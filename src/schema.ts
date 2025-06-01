@@ -12,6 +12,7 @@ import {
 
 export default object({
     version: pipe(number(), value(1, "Version must be 1")),
+    path: string(),
     filter: string(),
     columns: array(
         object({
