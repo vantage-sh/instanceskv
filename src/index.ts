@@ -28,7 +28,11 @@ async function putJson(request: Request, env: Env): Promise<Response> {
     return textResp(id, 200);
 }
 
-async function fetch(request: Request, env: Env): Promise<Response> {
+async function fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -49,17 +53,27 @@ async function fetch(request: Request, env: Env): Promise<Response> {
 
     if (request.method !== "GET") return notAllowedResp();
 
-    const instance = await env.INSTANCES_KV.get(path.substring(1));
-    if (!instance) return textResp("Not found", 404);
+    const cacheHit = await caches.default.match(url);
+    if (cacheHit) return cacheHit;
 
-    return new Response(instance, {
-        headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": allowedMethods,
-            "Access-Control-Allow-Headers": "Content-Type",
-        },
-    });
+    const instance = await env.INSTANCES_KV.get(path.substring(1));
+    let resp: Response;
+    if (instance) {
+        resp = new Response(instance, {
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": allowedMethods,
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Cache-Control": "public, max-age=604800",
+            },
+        });
+    } else {
+        resp = textResp("Not found", 404);
+        resp.headers.set("Cache-Control", "public, max-age=604800");
+    }
+    ctx.waitUntil(caches.default.put(url, resp.clone()));
+    return resp;
 }
 
 export default {
