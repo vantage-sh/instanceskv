@@ -25,7 +25,7 @@ async function putJson(request: Request, env: Env): Promise<Response> {
 
     // Hash the instance
     const id = await crypto.subtle.digest(
-        "SHA-256",
+        "SHA-1",
         new TextEncoder().encode(serialized),
     );
     const idString = Array.from(new Uint8Array(id))
