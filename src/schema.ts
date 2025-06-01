@@ -26,4 +26,8 @@ export default object({
     compareOn: boolean(),
     selected: array(string()),
     visibleColumns: record(string(), boolean()),
+    sort: object({
+        desc: boolean(),
+        id: string(),
+    }),
 });
