@@ -1,18 +1,21 @@
 {
-	"name": "instanceskv",
-	"version": "0.0.0",
-	"private": true,
-	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"test": "vitest",
-		"cf-typegen": "wrangler types"
-	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.8.19",
-		"typescript": "^5.5.2",
-		"vitest": "~3.0.7",
-		"wrangler": "^4.18.0"
-	}
+    "name": "instanceskv",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "deploy": "wrangler deploy",
+        "dev": "wrangler dev",
+        "start": "wrangler dev",
+        "cf-typegen": "wrangler types",
+        "format": "prettier --write ."
+    },
+    "devDependencies": {
+        "@cloudflare/vitest-pool-workers": "^0.8.19",
+        "typescript": "^5.5.2",
+        "wrangler": "^4.18.0",
+        "prettier": "^3.5.3"
+    },
+    "dependencies": {
+        "valibot": "^1.1.0"
+    }
 }
