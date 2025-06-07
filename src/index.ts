@@ -7,6 +7,56 @@ const textResp = (message: string, status: number) =>
         headers: { "Access-Control-Allow-Origin": "*" },
     });
 
+async function getJson(url: URL, jsonString: string): Promise<void>;
+async function getJson(
+    url: URL,
+    env: Env,
+    path: string,
+    ctx: ExecutionContext,
+): Promise<Response>;
+async function getJson(
+    url: URL,
+    envOrJsonString: Env | string,
+    path?: string,
+    ctx?: ExecutionContext,
+): Promise<Response | void> {
+    // Try the cache if this is a standard get request
+    if (ctx) {
+        const cacheHit = await caches.default.match(url);
+        if (cacheHit) return cacheHit;
+    }
+
+    let instance: string | null;
+    if (typeof envOrJsonString === "string") {
+        // We invoked this on ourself - use our own json string
+        instance = envOrJsonString;
+    } else {
+        // Try to get the instance from the KV
+        instance = await envOrJsonString.INSTANCES_KV.get(path!.substring(1));
+        if (!instance) return textResp("Not found", 404);
+    }
+
+    // Create the response object. We can cache effectively infinitely because the path is a hash of the instance.
+    const resp = new Response(instance, {
+        headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Cache-Control": "public, max-age=604800",
+        },
+    });
+
+    if (ctx) {
+        // This is a standard get request - cache outside the user waiting
+        ctx.waitUntil(caches.default.put(url, resp.clone()));
+        return resp;
+    }
+
+    // This is inside a waitUntil anyway so await the cache put
+    await caches.default.put(url, resp);
+}
+
 async function putJson(
     request: Request,
     env: Env,
@@ -49,15 +99,7 @@ async function putJson(
     await env.INSTANCES_KV.put(idString, serialized);
 
     // Do the get to setup the cache and return the id
-    ctx.waitUntil(
-        fetch(
-            new Request(url, {
-                method: "GET",
-            }),
-            env,
-            ctx,
-        ),
-    );
+    ctx.waitUntil(getJson(url, serialized));
     return textResp(idString, 200);
 }
 
@@ -85,23 +127,7 @@ async function fetch(
     }
 
     if (request.method !== "GET") return notAllowedResp();
-
-    const cacheHit = await caches.default.match(url);
-    if (cacheHit) return cacheHit;
-
-    const instance = await env.INSTANCES_KV.get(path.substring(1));
-    if (!instance) return textResp("Not found", 404);
-    const resp = new Response(instance, {
-        headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": allowedMethods,
-            "Access-Control-Allow-Headers": "Content-Type",
-            "Cache-Control": "public, max-age=604800",
-        },
-    });
-    ctx.waitUntil(caches.default.put(url, resp.clone()));
-    return resp;
+    return getJson(url, env, path, ctx);
 }
 
 export default {
