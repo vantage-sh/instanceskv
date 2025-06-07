@@ -11,13 +11,11 @@ async function getJson(url: URL, jsonString: string): Promise<void>;
 async function getJson(
     url: URL,
     env: Env,
-    path: string,
     ctx: ExecutionContext,
 ): Promise<Response>;
 async function getJson(
     url: URL,
     envOrJsonString: Env | string,
-    path?: string,
     ctx?: ExecutionContext,
 ): Promise<Response | void> {
     // Try the cache if this is a standard get request
@@ -32,7 +30,9 @@ async function getJson(
         instance = envOrJsonString;
     } else {
         // Try to get the instance from the KV
-        instance = await envOrJsonString.INSTANCES_KV.get(path!.substring(1));
+        instance = await envOrJsonString.INSTANCES_KV.get(
+            url.pathname.substring(1),
+        );
         if (!instance) return textResp("Not found", 404);
     }
 
@@ -59,6 +59,7 @@ async function getJson(
 
 async function putJson(
     request: Request,
+    url: URL,
     env: Env,
     ctx: ExecutionContext,
 ): Promise<Response> {
@@ -90,7 +91,6 @@ async function putJson(
         .join("");
 
     // Check if the instance is in the cache
-    const url = new URL(request.url);
     url.pathname = `/${idString}`;
     const cacheHit = await caches.default.match(url);
     if (cacheHit) return textResp(idString, 200);
@@ -109,7 +109,6 @@ async function fetch(
     ctx: ExecutionContext,
 ): Promise<Response> {
     const url = new URL(request.url);
-    const path = url.pathname;
 
     let allowedMethods = "GET";
     const notAllowedResp = () =>
@@ -120,14 +119,14 @@ async function fetch(
                 Allow: allowedMethods,
             },
         });
-    if (path === "/") {
-        if (request.method === "POST") return putJson(request, env, ctx);
+    if (url.pathname === "/") {
+        if (request.method === "POST") return putJson(request, url, env, ctx);
         allowedMethods = "POST";
         return notAllowedResp();
     }
 
     if (request.method !== "GET") return notAllowedResp();
-    return getJson(url, env, path, ctx);
+    return getJson(url, env, ctx);
 }
 
 export default {
