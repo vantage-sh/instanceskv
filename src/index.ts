@@ -7,7 +7,12 @@ const textResp = (message: string, status: number) =>
         headers: { "Access-Control-Allow-Origin": "*" },
     });
 
-async function putJson(request: Request, env: Env): Promise<Response> {
+async function putJson(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+): Promise<Response> {
+    // Make sure the request is a JSON object
     let j: unknown;
     try {
         j = await request.json();
@@ -15,10 +20,12 @@ async function putJson(request: Request, env: Env): Promise<Response> {
         return textResp("Invalid JSON", 400);
     }
 
+    // Parse the JSON object
     const parsed = safeParse(schema, j);
     if (!parsed.success)
         return textResp(parsed.issues.map((i) => i.message).join(", "), 400);
 
+    // Check if the instance is too large
     const serialized = JSON.stringify(parsed.output);
     if (serialized.length > 15 * 1024)
         return textResp("Instance too large", 413);
@@ -32,7 +39,25 @@ async function putJson(request: Request, env: Env): Promise<Response> {
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
 
+    // Check if the instance is in the cache
+    const url = new URL(request.url);
+    url.pathname = `/${idString}`;
+    const cacheHit = await caches.default.match(url);
+    if (cacheHit) return textResp(idString, 200);
+
+    // Put the instance in the KV
     await env.INSTANCES_KV.put(idString, serialized);
+
+    // Do the get to setup the cache and return the id
+    ctx.waitUntil(
+        fetch(
+            new Request(url, {
+                method: "GET",
+            }),
+            env,
+            ctx,
+        ),
+    );
     return textResp(idString, 200);
 }
 
@@ -54,7 +79,7 @@ async function fetch(
             },
         });
     if (path === "/") {
-        if (request.method === "POST") return putJson(request, env);
+        if (request.method === "POST") return putJson(request, env, ctx);
         allowedMethods = "POST";
         return notAllowedResp();
     }
