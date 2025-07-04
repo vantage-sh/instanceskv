@@ -1,5 +1,8 @@
 import schema from "./schema";
+import { Redis } from "@upstash/redis/cloudflare";
 import { safeParse } from "valibot";
+
+let redis: Redis;
 
 const textResp = (message: string, status: number) =>
     new Response(message, {
@@ -8,31 +11,25 @@ const textResp = (message: string, status: number) =>
     });
 
 async function getJson(url: URL, jsonString: string): Promise<void>;
+async function getJson(url: URL, ctx: ExecutionContext): Promise<Response>;
 async function getJson(
     url: URL,
-    env: Env,
-    ctx: ExecutionContext,
-): Promise<Response>;
-async function getJson(
-    url: URL,
-    envOrJsonString: Env | string,
-    ctx?: ExecutionContext,
+    ctxOrJsonString: ExecutionContext | string,
 ): Promise<Response | void> {
     // Try the cache if this is a standard get request
-    if (ctx) {
+    const isCacheWarmer = typeof ctxOrJsonString === "string";
+    if (!isCacheWarmer) {
         const cacheHit = await caches.default.match(url);
         if (cacheHit) return cacheHit;
     }
 
     let instance: string | null;
-    if (typeof envOrJsonString === "string") {
+    if (isCacheWarmer) {
         // We invoked this on ourself - use our own json string
-        instance = envOrJsonString;
+        instance = ctxOrJsonString;
     } else {
         // Try to get the instance from the KV
-        instance = await envOrJsonString.INSTANCES_KV.get(
-            url.pathname.substring(1),
-        );
+        instance = await redis.get(url.pathname.substring(1));
         if (!instance) return textResp("Not found", 404);
     }
 
@@ -47,9 +44,9 @@ async function getJson(
         },
     });
 
-    if (ctx) {
+    if (!isCacheWarmer) {
         // This is a standard get request - cache outside the user waiting
-        ctx.waitUntil(caches.default.put(url, resp.clone()));
+        ctxOrJsonString.waitUntil(caches.default.put(url, resp.clone()));
         return resp;
     }
 
@@ -60,7 +57,6 @@ async function getJson(
 async function putJson(
     request: Request,
     url: URL,
-    env: Env,
     ctx: ExecutionContext,
 ): Promise<Response> {
     // Make sure the request is a JSON object
@@ -96,7 +92,7 @@ async function putJson(
     if (cacheHit) return textResp(idString, 200);
 
     // Put the instance in the KV
-    await env.INSTANCES_KV.put(idString, serialized);
+    await redis.set(idString, serialized);
 
     // Do the get to setup the cache and return the id
     ctx.waitUntil(getJson(url, serialized));
@@ -110,6 +106,18 @@ async function fetch(
 ): Promise<Response> {
     const url = new URL(request.url);
 
+    if (!redis) {
+        if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
+            throw new Error(
+                "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set",
+            );
+        }
+        redis = new Redis({
+            url: env.UPSTASH_REDIS_REST_URL!,
+            token: env.UPSTASH_REDIS_REST_TOKEN!,
+        });
+    }
+
     let allowedMethods = "GET";
     const notAllowedResp = () =>
         new Response(`Method not allowed. Allowed methods: ${allowedMethods}`, {
@@ -120,13 +128,13 @@ async function fetch(
             },
         });
     if (url.pathname === "/") {
-        if (request.method === "POST") return putJson(request, url, env, ctx);
+        if (request.method === "POST") return putJson(request, url, ctx);
         allowedMethods = "POST";
         return notAllowedResp();
     }
 
     if (request.method !== "GET") return notAllowedResp();
-    return getJson(url, env, ctx);
+    return getJson(url, ctx);
 }
 
 export default {

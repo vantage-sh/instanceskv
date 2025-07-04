@@ -3,10 +3,8 @@
     "name": "instanceskv",
     "main": "src/index.ts",
     "compatibility_date": "2025-05-31",
-    "kv_namespaces": [
-        {
-            "binding": "INSTANCES_KV",
-            "id": "c63825245ea14f27b0f365ea15e363ef",
-        },
-    ],
+    "vars": {
+        "UPSTASH_REDIS_REST_URL": "@UPSTASH_REDIS_REST_URL",
+        "UPSTASH_REDIS_REST_TOKEN": "@UPSTASH_REDIS_REST_TOKEN",
+    },
 }
