@@ -7,15 +7,18 @@
         "dev": "wrangler dev",
         "start": "wrangler dev",
         "cf-typegen": "wrangler types",
-        "format": "prettier --write ."
+        "format": "prettier --write .",
+        "check-types": "tsc --noEmit"
     },
     "devDependencies": {
         "@cloudflare/vitest-pool-workers": "^0.8.19",
+        "@types/node": "^24.0.10",
+        "prettier": "^3.5.3",
         "typescript": "^5.5.2",
-        "wrangler": "^4.18.0",
-        "prettier": "^3.5.3"
+        "wrangler": "^4.18.0"
     },
     "dependencies": {
+        "@upstash/redis": "^1.35.1",
         "valibot": "^1.1.0"
     }
 }
