@@ -8,6 +8,7 @@ import {
     any,
     boolean,
     record,
+    optional,
 } from "valibot";
 
 export default object({
@@ -33,4 +34,5 @@ export default object({
             id: string(),
         }),
     ),
+    currency: optional(string()),
 });
